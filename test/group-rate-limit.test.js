@@ -250,3 +250,20 @@ test('Invalid groupId type', async () => {
     assert.deepStrictEqual(err.message, 'groupId must be a string')
   }
 })
+
+test('two routes sharing one groupId share the counter', async (t) => {
+  const app = Fastify()
+  t.after(() => app.close())
+  await app.register(rateLimit, { max: 100, timeWindow: '1 minute' })
+
+  const config = { rateLimit: { max: 3, timeWindow: '1 minute', groupId: 'OTP' } }
+  app.get('/otp/send', { config }, async () => 'sent')
+  app.get('/otp/resend', { config }, async () => 'resent')
+
+  const urls = ['/otp/send', '/otp/send', '/otp/send', '/otp/resend']
+  let lastRes
+  for (const url of urls) {
+    lastRes = await app.inject({ url })
+  }
+  t.assert.strictEqual(lastRes.statusCode, 429)
+})
